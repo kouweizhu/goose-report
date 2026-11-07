@@ -237,164 +237,8 @@
       *{animation-duration:.01ms !important;transition-duration:.01ms !important}
     }
 </style>
-  <script>/* 方案A「鹅舍手账」增强层 —— 只操作静态模板 DOM，绝不触碰 10 对标记内容 */
-(function () {
-  'use strict';
-  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  /* 1. 季节刻度每月小图标（休产月白底虚线灰字是有意空档，不改其类） */
-  var icons = ['❄️','❄️','❄️','🌱','☀️','☀️','🌻','🍂','🍂','🌾','🍁','⛄'];
-  var nodes = document.querySelectorAll('#seasonStrip .m');
-  for (var i = 0; i < nodes.length; i++) {
-    var m = parseInt(nodes[i].getAttribute('data-m'), 10);
-    var icon = document.createElement('span');
-    icon.className = 'mo-icon';
-    icon.textContent = icons[m - 1] || '·';
-    nodes[i].insertBefore(icon, nodes[i].firstChild);
-  }
-
-  /* 2. 印章日期：读页脚数据截止，不改标记内文字 */
-  try {
-    var f = document.querySelector('footer');
-    var stamp = document.getElementById('gooseStamp');
-    if (f && stamp) {
-      var mt = f.textContent.match(/截止\s*(\d{4})-(\d{2})-(\d{2})/);
-      if (mt) stamp.textContent = '鹅舍产蛋手账 · 第 ' + mt[1] + ' 册 · 核至 ' + mt[2] + '/' + mt[3];
-    }
-  } catch (e) {}
-
-  /* 3. 数字浮现（不改动最终值，避免截图/打印/慢设备读到中间态）
-     做法是给个短促的透明度+位移入场，文本自始至终是最终值。 */
-  if (!reduce) {
-    document.querySelectorAll('.summary-box .num').forEach(function (el, i) {
-      el.style.opacity = '0';
-      el.style.transform = 'translateY(6px)';
-      el.style.transition = 'opacity .45s ease, transform .45s ease';
-      setTimeout(function () { el.style.opacity = '1'; el.style.transform = 'none'; }, 60 + i * 70);
-    });
-  }
-
-  /* 4. 轻浮现（IntersectionObserver，无依赖） */
-  if (!reduce && 'IntersectionObserver' in window) {
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) {
-        if (en.isIntersecting) { en.target.style.opacity = '1'; io.unobserve(en.target); }
-      });
-    }, { threshold: 0.08 });
-    document.querySelectorAll('.card, .summary-box').forEach(function (el) {
-      el.style.opacity = '0';
-      el.style.transition = 'opacity .5s ease, transform .2s ease, box-shadow .2s ease';
-      io.observe(el);
-    });
-  }
-
-  /* 5. 点鹅蛋撒 🥚（纯 Canvas 自写纸屑，不引外部库；reduced-motion 下不触发） */
-  function burst(x, y) {
-    var cv = document.createElement('canvas');
-    cv.style.cssText = 'position:fixed;left:0;top:0;pointer-events:none;z-index:9999';
-    cv.width = innerWidth; cv.height = innerHeight;
-    document.body.appendChild(cv);
-    var c = cv.getContext('2d'), parts = [], emoji = ['🥚','🪿','✦','·'];
-    for (var i = 0; i < 34; i++) {
-      parts.push({ x: x, y: y, vx: (Math.random() - .5) * 11, vy: -Math.random() * 9 - 3,
-        r: 5 + Math.random() * 8, a: 1, ch: Math.random() < .4 ? emoji[i % 2] : null,
-        col: ['#c8543f','#3d7ea6','#5b8c5a','#c39a63','#7d5ba6'][i % 5], rot: Math.random() * 6 });
-    }
-    var n = 0;
-    (function tick() {
-      c.clearRect(0, 0, cv.width, cv.height);
-      parts.forEach(function (p) {
-        p.x += p.vx; p.y += p.vy; p.vy += .28; p.a -= .014; p.rot += .08;
-        c.globalAlpha = Math.max(0, p.a);
-        if (p.ch) { c.font = '16px serif'; c.fillText(p.ch, p.x, p.y); }
-        else { c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.fillStyle = p.col;
-               c.fillRect(-p.r/2, -p.r/2, p.r, p.r * .7); c.restore(); }
-      });
-      c.globalAlpha = 1;
-      if (++n < 90) requestAnimationFrame(tick); else cv.remove();
-    })();
-  }
-  if (!reduce) {
-    var badge = document.querySelector('.hero-badge');
-    if (badge) badge.addEventListener('click', function (e) {
-      var r = badge.getBoundingClientRect();
-      burst(r.left + r.width / 2, r.top + r.height / 2);
-    });
-  }
-
-  /* 6. 图表库降级提示：Chart.js 未加载时把提示显出来，文字/表格仍完整 */
-  window.addEventListener('load', function () {
-    if (typeof window.Chart === 'undefined') {
-      var fb = document.getElementById('chartFallback');
-      var cv = document.getElementById('eggChart');
-      if (fb) fb.style.display = 'block';
-      if (cv) cv.style.display = 'none';
-    } else {
-      var c = document.getElementById('eggChart');
-      if (c && (!c.width || !c.height)) { /* canvas 已由 Chart.js 渲染 */ }
-    }
-  });
-})();
-</script>
-  <script>/* 方案A 手绘鹅 SVG（纯代码自绘，不调用生图服务，离线可用） */
-(function () {
-  'use strict';
-  if (document.getElementById('gooseSvgDefs')) return;
-
-  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.id = 'gooseSvgDefs';
-  svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
-  svg.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden');
-  svg.innerHTML =
-    '<defs>' +
-    '<g id="goose-art">' +
-    // 身体
-    '<path d="M18 62 C14 46 22 30 42 27 C60 24 78 32 82 48 C85 60 78 70 62 72 C44 74 24 72 18 62 Z" ' +
-      'fill="#fffdf3" stroke="#7a5c38" stroke-width="2.2" stroke-linejoin="round"/>' +
-    // 尾巴
-    '<path d="M18 54 L6 44 L10 58 L4 66 L20 64" fill="#f3e6c8" stroke="#7a5c38" stroke-width="2" stroke-linejoin="round"/>' +
-    // 脖子与头
-    '<path d="M70 34 C74 20 72 10 80 7 C88 4 96 9 95 18 C94 26 88 31 84 38" ' +
-      'fill="none" stroke="#7a5c38" stroke-width="2.2" stroke-linecap="round"/>' +
-    '<circle cx="86" cy="14" r="10" fill="#fffdf3" stroke="#7a5c38" stroke-width="2.2"/>' +
-    // 喙
-    '<path d="M95 13 L108 16 L95 20 Z" fill="#e8a54c" stroke="#b5762e" stroke-width="1.8" stroke-linejoin="round"/>' +
-    // 眼睛
-    '<circle cx="89" cy="11" r="1.9" fill="#3b3327"/>' +
-    // 翅膀
-    '<path d="M36 40 C48 36 62 40 66 50 C60 58 46 58 36 52 Z" fill="#f0e2c2" stroke="#7a5c38" stroke-width="1.8"/>' +
-    '<path d="M40 45 C50 43 58 45 62 50" fill="none" stroke="#c9ad7e" stroke-width="1.4" stroke-linecap="round"/>' +
-    // 脚
-    '<path d="M40 72 L38 82 M52 72 L52 82 M36 82 L44 82 M48 82 L56 82" stroke="#b5762e" stroke-width="2" stroke-linecap="round"/>' +
-    // 一枚蛋
-    '<ellipse cx="16" cy="76" rx="9" ry="11" fill="#fff6e2" stroke="#c9ad7e" stroke-width="1.6" transform="rotate(-12 16 76)"/>' +
-    '</g></defs>';
-  document.body.insertBefore(svg, document.body.firstChild);
-
-  // 在侧栏 brand 的 egg 徽章旁挂一只小鹅；在报告页 hero 里也挂一只
-  function attach(selector, w, h, style) {
-    var host = document.querySelector(selector);
-    if (!host) return;
-    var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    s.setAttribute('viewBox', '0 0 116 90');
-    s.setAttribute('width', w); s.setAttribute('height', h);
-    s.setAttribute('style', style || '');
-    s.innerHTML = '<use href="#goose-art"></use>';
-    host.appendChild(s);
-  }
-  // 工作台侧栏
-  attach('.side .brand', 46, 36, 'position:absolute;right:4px;top:2px;opacity:.9;transform:rotate(6deg)');
-  // 报告页封面（若存在）
-  var hero = document.querySelector('.hero');
-  if (hero) {
-    var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    s.setAttribute('viewBox', '0 0 116 90'); s.setAttribute('width', '84'); s.setAttribute('height', '66');
-    s.setAttribute('style', 'position:absolute;left:18px;bottom:10px;opacity:.55;transform:rotate(-8deg)');
-    s.innerHTML = '<use href="#goose-art"></use>';
-    hero.appendChild(s);
-  }
-})();
-</script>
+  
+  
 </head>
 <body>
 <div class="container">
@@ -648,6 +492,164 @@
       }
     }
   })();
+</script>
+<script>/* 方案A「鹅舍手账」增强层 —— 只操作静态模板 DOM，绝不触碰 10 对标记内容 */
+(function () {
+  'use strict';
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* 1. 季节刻度每月小图标（休产月白底虚线灰字是有意空档，不改其类） */
+  var icons = ['❄️','❄️','❄️','🌱','☀️','☀️','🌻','🍂','🍂','🌾','🍁','⛄'];
+  var nodes = document.querySelectorAll('#seasonStrip .m');
+  for (var i = 0; i < nodes.length; i++) {
+    var m = parseInt(nodes[i].getAttribute('data-m'), 10);
+    var icon = document.createElement('span');
+    icon.className = 'mo-icon';
+    icon.textContent = icons[m - 1] || '·';
+    nodes[i].insertBefore(icon, nodes[i].firstChild);
+  }
+
+  /* 2. 印章日期：读页脚数据截止，不改标记内文字 */
+  try {
+    var f = document.querySelector('footer');
+    var stamp = document.getElementById('gooseStamp');
+    if (f && stamp) {
+      var mt = f.textContent.match(/截止\s*(\d{4})-(\d{2})-(\d{2})/);
+      if (mt) stamp.textContent = '鹅舍产蛋手账 · 第 ' + mt[1] + ' 册 · 核至 ' + mt[2] + '/' + mt[3];
+    }
+  } catch (e) {}
+
+  /* 3. 数字浮现（不改动最终值，避免截图/打印/慢设备读到中间态）
+     做法是给个短促的透明度+位移入场，文本自始至终是最终值。 */
+  if (!reduce) {
+    document.querySelectorAll('.summary-box .num').forEach(function (el, i) {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(6px)';
+      el.style.transition = 'opacity .45s ease, transform .45s ease';
+      setTimeout(function () { el.style.opacity = '1'; el.style.transform = 'none'; }, 60 + i * 70);
+    });
+  }
+
+  /* 4. 轻浮现（IntersectionObserver，无依赖） */
+  if (!reduce && 'IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { en.target.style.opacity = '1'; io.unobserve(en.target); }
+      });
+    }, { threshold: 0.08 });
+    document.querySelectorAll('.card, .summary-box').forEach(function (el) {
+      el.style.opacity = '0';
+      el.style.transition = 'opacity .5s ease, transform .2s ease, box-shadow .2s ease';
+      io.observe(el);
+    });
+  }
+
+  /* 5. 点鹅蛋撒 🥚（纯 Canvas 自写纸屑，不引外部库；reduced-motion 下不触发） */
+  function burst(x, y) {
+    var cv = document.createElement('canvas');
+    cv.style.cssText = 'position:fixed;left:0;top:0;pointer-events:none;z-index:9999';
+    cv.width = innerWidth; cv.height = innerHeight;
+    document.body.appendChild(cv);
+    var c = cv.getContext('2d'), parts = [], emoji = ['🥚','🪿','✦','·'];
+    for (var i = 0; i < 34; i++) {
+      parts.push({ x: x, y: y, vx: (Math.random() - .5) * 11, vy: -Math.random() * 9 - 3,
+        r: 5 + Math.random() * 8, a: 1, ch: Math.random() < .4 ? emoji[i % 2] : null,
+        col: ['#c8543f','#3d7ea6','#5b8c5a','#c39a63','#7d5ba6'][i % 5], rot: Math.random() * 6 });
+    }
+    var n = 0;
+    (function tick() {
+      c.clearRect(0, 0, cv.width, cv.height);
+      parts.forEach(function (p) {
+        p.x += p.vx; p.y += p.vy; p.vy += .28; p.a -= .014; p.rot += .08;
+        c.globalAlpha = Math.max(0, p.a);
+        if (p.ch) { c.font = '16px serif'; c.fillText(p.ch, p.x, p.y); }
+        else { c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.fillStyle = p.col;
+               c.fillRect(-p.r/2, -p.r/2, p.r, p.r * .7); c.restore(); }
+      });
+      c.globalAlpha = 1;
+      if (++n < 90) requestAnimationFrame(tick); else cv.remove();
+    })();
+  }
+  if (!reduce) {
+    var badge = document.querySelector('.hero-badge');
+    if (badge) badge.addEventListener('click', function (e) {
+      var r = badge.getBoundingClientRect();
+      burst(r.left + r.width / 2, r.top + r.height / 2);
+    });
+  }
+
+  /* 6. 图表库降级提示：Chart.js 未加载时把提示显出来，文字/表格仍完整 */
+  window.addEventListener('load', function () {
+    if (typeof window.Chart === 'undefined') {
+      var fb = document.getElementById('chartFallback');
+      var cv = document.getElementById('eggChart');
+      if (fb) fb.style.display = 'block';
+      if (cv) cv.style.display = 'none';
+    } else {
+      var c = document.getElementById('eggChart');
+      if (c && (!c.width || !c.height)) { /* canvas 已由 Chart.js 渲染 */ }
+    }
+  });
+})();
+</script>
+<script>/* 方案A 手绘鹅 SVG（纯代码自绘，不调用生图服务，离线可用） */
+(function () {
+  'use strict';
+  if (document.getElementById('gooseSvgDefs')) return;
+
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.id = 'gooseSvgDefs';
+  svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
+  svg.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden');
+  svg.innerHTML =
+    '<defs>' +
+    '<g id="goose-art">' +
+    // 身体
+    '<path d="M18 62 C14 46 22 30 42 27 C60 24 78 32 82 48 C85 60 78 70 62 72 C44 74 24 72 18 62 Z" ' +
+      'fill="#fffdf3" stroke="#7a5c38" stroke-width="2.2" stroke-linejoin="round"/>' +
+    // 尾巴
+    '<path d="M18 54 L6 44 L10 58 L4 66 L20 64" fill="#f3e6c8" stroke="#7a5c38" stroke-width="2" stroke-linejoin="round"/>' +
+    // 脖子与头
+    '<path d="M70 34 C74 20 72 10 80 7 C88 4 96 9 95 18 C94 26 88 31 84 38" ' +
+      'fill="none" stroke="#7a5c38" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<circle cx="86" cy="14" r="10" fill="#fffdf3" stroke="#7a5c38" stroke-width="2.2"/>' +
+    // 喙
+    '<path d="M95 13 L108 16 L95 20 Z" fill="#e8a54c" stroke="#b5762e" stroke-width="1.8" stroke-linejoin="round"/>' +
+    // 眼睛
+    '<circle cx="89" cy="11" r="1.9" fill="#3b3327"/>' +
+    // 翅膀
+    '<path d="M36 40 C48 36 62 40 66 50 C60 58 46 58 36 52 Z" fill="#f0e2c2" stroke="#7a5c38" stroke-width="1.8"/>' +
+    '<path d="M40 45 C50 43 58 45 62 50" fill="none" stroke="#c9ad7e" stroke-width="1.4" stroke-linecap="round"/>' +
+    // 脚
+    '<path d="M40 72 L38 82 M52 72 L52 82 M36 82 L44 82 M48 82 L56 82" stroke="#b5762e" stroke-width="2" stroke-linecap="round"/>' +
+    // 一枚蛋
+    '<ellipse cx="16" cy="76" rx="9" ry="11" fill="#fff6e2" stroke="#c9ad7e" stroke-width="1.6" transform="rotate(-12 16 76)"/>' +
+    '</g></defs>';
+  document.body.insertBefore(svg, document.body.firstChild);
+
+  // 在侧栏 brand 的 egg 徽章旁挂一只小鹅；在报告页 hero 里也挂一只
+  function attach(selector, w, h, style) {
+    var host = document.querySelector(selector);
+    if (!host) return;
+    var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('viewBox', '0 0 116 90');
+    s.setAttribute('width', w); s.setAttribute('height', h);
+    s.setAttribute('style', style || '');
+    s.innerHTML = '<use href="#goose-art"></use>';
+    host.appendChild(s);
+  }
+  // 工作台侧栏
+  attach('.side .brand', 46, 36, 'position:absolute;right:4px;top:2px;opacity:.9;transform:rotate(6deg)');
+  // 报告页封面（若存在）
+  var hero = document.querySelector('.hero');
+  if (hero) {
+    var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('viewBox', '0 0 116 90'); s.setAttribute('width', '84'); s.setAttribute('height', '66');
+    s.setAttribute('style', 'position:absolute;left:18px;bottom:10px;opacity:.55;transform:rotate(-8deg)');
+    s.innerHTML = '<use href="#goose-art"></use>';
+    hero.appendChild(s);
+  }
+})();
 </script>
 </body>
 </html>
